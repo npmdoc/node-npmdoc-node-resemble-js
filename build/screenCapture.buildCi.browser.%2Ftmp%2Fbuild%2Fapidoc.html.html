@@ -1,0 +1,332 @@
+<html><head></head><body><div class="apidocDiv">
+<style>
+/*csslint
+*/
+.apidocDiv {
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.apidocDiv a[href] {
+    color: #33f;
+    font-weight: bold;
+    text-decoration: none;
+}
+.apidocDiv a[href]:hover {
+    text-decoration: underline;
+}
+.apidocCodeCommentSpan {
+    background: #bbf;
+    color: #000;
+    display: block;
+}
+.apidocCodeKeywordSpan {
+    color: #d00;
+    font-weight: bold;
+}
+.apidocCodePre {
+    background: #eef;
+    border: 1px solid;
+    color: #777;
+    padding: 5px;
+    white-space: pre-wrap;
+}
+.apidocFooterDiv {
+    margin-top: 20px;
+    text-align: center;
+}
+.apidocModuleLi {
+    margin-top: 10px;
+}
+.apidocSectionDiv {
+    border-top: 1px solid;
+    margin-top: 20px;
+}
+.apidocSignatureSpan {
+    color: #777;
+    font-weight: bold;
+}
+</style>
+<h1>api documentation for
+    <a href="https://github.com/lksv/node-resemble.js">node-resemble-js (v0.2.0)</a>
+</h1>
+<h4>Image analysis and comparison for nodejs</h4>
+<div class="apidocSectionDiv"><a href="#apidoc.tableOfContents" id="apidoc.tableOfContents"><h1>table of contents</h1></a><ol>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.node-resemble-js">module node-resemble-js</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.node-resemble-js.node-resemble-js">
+            function <span class="apidocSignatureSpan"></span>node-resemble-js
+            <span class="apidocSignatureSpan">( fileData )</span>
+            </a>
+
+        </li>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.node-resemble-js.outputSettings">
+            function <span class="apidocSignatureSpan">node-resemble-js.</span>outputSettings
+            <span class="apidocSignatureSpan">(options)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+</ol></div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.node-resemble-js" id="apidoc.module.node-resemble-js">module node-resemble-js</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.node-resemble-js.node-resemble-js" id="apidoc.element.node-resemble-js.node-resemble-js">
+        function <span class="apidocSignatureSpan"></span>node-resemble-js
+        <span class="apidocSignatureSpan">( fileData )</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">node-resemble-js = function ( fileData ){
+
+		var data = {};
+		var images = [];
+		var updateCallbackArray = [];
+
+		var tolerance = { // between 0 and 255
+			red: 16,
+			green: 16,
+			blue: 16,
+			alpha: 16,
+			minBrightness: 16,
+			maxBrightness: 240
+		};
+
+		var ignoreAntialiasing = false;
+		var ignoreColors = false;
+    var ignoreRectangles = null;
+
+		function triggerDataUpdate(){
+			var len = updateCallbackArray.length;
+			var i;
+			for(i=0;i&lt;len;i++){
+				if (typeof updateCallbackArray[i] === 'function'){
+					updateCallbackArray[i](data);
+				}
+			}
+		}
+
+		function loop(x, y, callback){
+			var i,j;
+
+			for (i=0;i&lt;x;i++){
+				for (j=0;j&lt;y;j++){
+					callback(i, j);
+				}
+			}
+		}
+
+		function parseImage(sourceImageData, width, height){
+
+			var pixleCount = 0;
+			var redTotal = 0;
+			var greenTotal = 0;
+			var blueTotal = 0;
+			var brightnessTotal = 0;
+
+			loop(height, width, function(verticalPos, horizontalPos){
+				var offset = (verticalPos*width + horizontalPos) * 4;
+				var red = sourceImageData[offset];
+				var green = sourceImageData[offset + 1];
+				var blue = sourceImageData[offset + 2];
+				var brightness = getBrightness(red,green,blue);
+
+				pixleCount++;
+
+				redTotal += red / 255 * 100;
+				greenTotal += green / 255 * 100;
+				blueTotal += blue / 255 * 100;
+				brightnessTotal += brightness / 255 * 100;
+			});
+
+			data.red = Math.floor(redTotal / pixleCount);
+			data.green = Math.floor(greenTotal / pixleCount);
+			data.blue = Math.floor(blueTotal / pixleCount);
+			data.brightness = Math.floor(brightnessTotal / pixleCount);
+
+			triggerDataUpdate();
+		}
+
+		function loadImageData( fileData, callback ){
+
+			if (Buffer.isBuffer(fileData)) {
+				var png = new PNG();
+				png.parse(fileData, function (err, data) {
+				  callback(data, data.width, data.height);
+				});
+			} else {
+				var ext = fileData.substring(fileData.lastIndexOf(".")+1);
+				if(ext=="png") {
+					var png = new PNG();
+					fs.createReadStream(fileData)
+					  .pipe(png)
+					  .on('parsed', function() {
+						callback(this, this.width, this.height);
+					  });
+				}
+				if(ext=="jpg" || ext=="jpeg") {
+					var jpegData = fs.readFileSync(fileData);
+					fileData = jpeg.decode(jpegData, true);
+					callback(fileData, fileData.width, fileData.height);
+				}
+			};
+		}
+
+		function isColorSimilar(a, b, color){
+
+			var absDiff = Math.abs(a - b);
+
+			if(typeof a === 'undefined'){
+				return false;
+			}
+			if(typeof b === 'undefined'){
+				return false;
+			}
+
+			if(a === b){
+				return true;
+			} else if ( absDiff &lt; tolerance[color] ) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+
+		function isNumber(n) {
+			return !isNaN(parseFloat(n));
+		}
+
+		function isPixelBrightnessSimilar(d1, d2){
+			var alpha = isColorSimilar(d1.a, d2.a, 'alpha');
+			var brightness = isColorSimilar(d1.brightness, d2.brightness, 'minBrightness');
+			return brightness &amp;&amp; alpha;
+		}
+
+		function getBrightness(r,g,b){
+			return 0.3*r + 0.59*g + 0.11*b;
+		}
+
+		function isRGBSame(d1,d2){
+			var red = d1.r === d2.r;
+			var green = d1.g === d2.g;
+			var blue = d1.b === d2.b;
+			return red &amp;&amp; green &amp;&amp; blue;
+		}
+
+		function isRGBSimilar(d1, d2){
+			var red = isColorSimilar(d1.r,d2.r,'red');
+			var green = isColorSimilar(d1.g,d2.g,'green');
+			var blue = isColorSimilar(d1.b,d2.b,'blue');
+			var alpha = isColorSimilar(d1.a, d2.a, 'alpha');
+
+			return red &amp;&amp; green &amp;&amp; blue &amp;&amp; alpha;
+		}
+
+		function isContrasting(d1, d2){
+			return Math.abs(d1.brightness - d2.brightness) &gt; tolerance.maxBrightness;
+		}
+
+		function getHue(r,g,b){
+
+			r = r / 255;
+			g = g / 255;
+			b = b / 255;
+			var max = Math.max(r, g, b), min = Math.min(r, g, b);
+			var h;
+			var d;
+
+			if (max == min){
+				h = 0; // achromatic
+			} else{
+				d = max - min;
+				switch(max){
+					case r: h = (g - b) / d + (g &lt; b ? 6 : 0); break;
+					case g: h = (b - r) / d + 2; break;
+					case b: h = (r - g) / d + 4; break;
+				}
+				h /= 6;
+			}
+
+			return h;
+		}
+
+		function isAntialiased(sourcePix, data, cacheSet, verticalPos, horizontalPos, width){
+			var offset;
+			var targetPix;
+			var distance = 1;
+			var i;
+			var j;
+			var hasHighContrastSiblin ...</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+
+    <h2>
+        <a href="#apidoc.element.node-resemble-js.outputSettings" id="apidoc.element.node-resemble-js.outputSettings">
+        function <span class="apidocSignatureSpan">node-resemble-js.</span>outputSettings
+        <span class="apidocSignatureSpan">(options)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">outputSettings = function (options){
+		var key;
+		var undefined;
+
+		if(options.errorColor){
+			for (key in options.errorColor) {
+				errorPixelColor[key] = options.errorColor[key] === undefined ? errorPixelColor[key] : options.errorColor[key];
+			}
+		}
+
+		if(options.errorType &amp;&amp; errorPixelTransform[options.errorType] ){
+			errorPixelTransformer = errorPixelTransform[options.errorType];
+		}
+		
+		pixelTransparency = options.transparency || pixelTransparency;
+
+		if (options.largeImageThreshold !== undefined) {
+			largeImageThreshold = options.largeImageThreshold;
+		}
+
+		return this;
+	}</pre></li>
+    <li>example usage<pre class="apidocCodePre">...
+// diff.ignoreColors();
+diff.ignoreAntialiasing();
+```
+
+And change the output display style.
+
+```javascript
+resemble.<span class="apidocCodeKeywordSpan">outputSettings</span>({
+errorColor: {
+  red: 255,
+  green: 0,
+  blue: 255
+},
+errorType: 'movement',
+transparency: 0.3
+...</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocFooterDiv">
+    [ this document was created with
+    <a href="https://github.com/kaizhu256/node-utility2" target="_blank">utility2</a>
+    ]
+</div>
+</div>
+</body></html>
